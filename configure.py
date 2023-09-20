@@ -1145,10 +1145,7 @@ def host_arch_cc():
     rtn = 'mips64el'
 
   if rtn == 'riscv':
-    if k['__riscv_xlen'] == '64':
-      rtn = 'riscv64'
-    else:
-      rtn = 'riscv32'
+    rtn = 'riscv64' if k['__riscv_xlen'] == '64' else 'riscv32'
 
   return rtn
 
@@ -1185,6 +1182,7 @@ def configure_arm(o):
     o['variables']['arm_version'] = '7'
   else:
     o['variables']['arm_version'] = '6' if is_arch_armv6() else 'default'
+
 
   o['variables']['arm_thumb'] = 0      # -marm
   o['variables']['arm_float_abi'] = arm_float_abi
@@ -1291,17 +1289,8 @@ def configure_node(o):
     o['variables']['node_use_node_snapshot'] = b(
       not cross_compiling and not options.shared)
 
-  if options.without_node_code_cache or options.without_node_snapshot or options.node_builtin_modules_path:
-    o['variables']['node_use_node_code_cache'] = 'false'
-  else:
-    # TODO(refack): fix this when implementing embedded code-cache when cross-compiling.
-    o['variables']['node_use_node_code_cache'] = b(
-      not cross_compiling and not options.shared)
-
-  if options.write_snapshot_as_array_literals is not None:
-     o['variables']['node_write_snapshot_as_array_literals'] = b(options.write_snapshot_as_array_literals)
-  else:
-     o['variables']['node_write_snapshot_as_array_literals'] = b(flavor != 'mac' and flavor != 'linux')
+  o['variables']['node_use_node_code_cache'] = 'false' if options.without_node_code_cache or options.without_node_snapshot or options.node_builtin_modules_path else b(not cross_compiling and not options.shared)
+  o['variables']['node_write_snapshot_as_array_literals'] = b(options.write_snapshot_as_array_literals) if options.write_snapshot_as_array_literals is not None  b(flavor != 'mac' and flavor != 'linux')
 
   if target_arch == 'arm':
     configure_arm(o)
@@ -1379,11 +1368,7 @@ def configure_node(o):
   if flavor != 'win' and options.with_ltcg:
     raise Exception('Link Time Code Generation is only supported on Windows.')
 
-  if options.tag:
-    o['variables']['node_tag'] = '-' + options.tag
-  else:
-    o['variables']['node_tag'] = ''
-
+  o['variables']['node_tag'] = '-' + options.tag if options.tag else ''
   o['variables']['node_release_urlbase'] = options.release_urlbase or ''
 
   if options.v8_options:
@@ -1393,14 +1378,8 @@ def configure_node(o):
     o['variables']['node_target_type'] = 'static_library'
 
   o['variables']['node_debug_lib'] = b(options.node_debug_lib)
-
-  if options.debug_nghttp2:
-    o['variables']['debug_nghttp2'] = 1
-  else:
-    o['variables']['debug_nghttp2'] = 'false'
-
+  o['variables']['debug_nghttp2'] = 1 if options.debug_nghttp2 else 'false'
   o['variables']['node_no_browser_globals'] = b(options.no_browser_globals)
-
   o['variables']['node_shared'] = b(options.shared)
   o['variables']['libdir'] = options.libdir
   node_module_version = getmoduleversion.get_version()
@@ -1428,10 +1407,7 @@ def configure_node(o):
 
   o['variables']['asan'] = int(options.enable_asan or 0)
 
-  if options.coverage:
-    o['variables']['coverage'] = 'true'
-  else:
-    o['variables']['coverage'] = 'false'
+  o['variables']['coverage'] = 'true' if options.coverage else 'false'
 
   if options.shared:
     o['variables']['node_target_type'] = 'shared_library'
@@ -1589,10 +1565,7 @@ def configure_openssl(o):
   if options.openssl_is_fips and not options.shared_openssl:
     variables['node_fipsinstall'] = b(True)
 
-  if options.shared_openssl:
-    has_quic = getsharedopensslhasquic.get_has_quic(options.__dict__['shared_openssl_includes'])
-  else:
-    has_quic = getsharedopensslhasquic.get_has_quic('deps/openssl/openssl/include')
+  has_quic = getsharedopensslhasquic.get_has_quic(options.__dict__['shared_openssl_includes']) if options.shared_openssl else getsharedopensslhasquic.get_has_quic('deps/openssl/openssl/include')
 
   variables['openssl_quic'] = b(has_quic)
   if has_quic:
@@ -1947,29 +1920,22 @@ def configure_inspector(o):
 
 def configure_section_file(o):
   try:
-    proc = subprocess.Popen(['ld.gold'] + ['-v'], stdin = subprocess.PIPE,
-                            stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+    proc = subprocess.Popen(['ld.gold'] + ['-v'], stdin = subprocess.PIPE, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
   except OSError:
     if options.node_section_ordering_info != "":
       warn('''No acceptable ld.gold linker found!''')
     return 0
 
   with proc:
-    match = re.match(r"^GNU gold.*([0-9]+)\.([0-9]+)$",
-                     proc.communicate()[0].decode("utf-8"))
+    match = re.match(r"^GNU gold.*([0-9]+)\.([0-9]+)$", proc.communicate()[0].decode("utf-8"))
 
   if match:
     gold_major_version = match.group(1)
     gold_minor_version = match.group(2)
     if int(gold_major_version) == 1 and int(gold_minor_version) <= 1:
-      error('''GNU gold version must be greater than 1.2 in order to use section
-            reordering''')
+      error('''GNU gold version must be greater than 1.2 in order to use section reordering''')
 
-  if options.node_section_ordering_info != "":
-    o['variables']['node_section_ordering_info'] = os.path.realpath(
-      str(options.node_section_ordering_info))
-  else:
-    o['variables']['node_section_ordering_info'] = ""
+  o['variables']['node_section_ordering_info'] = os.path.realpath(str(options.node_section_ordering_info)) if options.node_section_ordering_info != "" else  ""
 
 def make_bin_override():
   if sys.platform == 'win32':
